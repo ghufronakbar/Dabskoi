@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String  @id @default(uuid())
+  email    String  @unique
+  password String
+  name     String
+  picture  String?
+  address  String  @db.Text()
+  phone    String
+
+  role Role
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // BID RELATION
+  bids Bid[]
+
+  chats Chat[] // also include nego response
+
+  historyBuy        KoiSell[] // history buy
+  historyWinNego    KoiNego[] // history buy winning nego
+  historyWinAuction KoiAuction[] // history buy winning auction
+
+  paymentHistory PaymentHistory[]
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model KoiSell {
+  id     String @id @default(uuid())
+  name   String
+  type   String
+  gender Gender
+  length Float
+  weight Float
+
+  price       Int // fixed final price
+  description String
+  images      String[]
+  certificate String?
+
+  status Status @default(AKTIF)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // INFORMATON ONLY FOR SELL
+  winnerId String?
+  winner   User?   @relation(fields: [winnerId], references: [id])
+}
+
+model KoiNego {
+  id     String @id @default(uuid())
+  name   String
+  type   String
+  gender Gender
+  length Float
+  weight Float
+
+  price       Int // negotiable price
+  description String
+  images      String[]
+  certificate String?
+
+  status Status @default(AKTIF)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // INFORMATON ONLY FOR NEGO
+  winnerId String?
+  winner   User?   @relation(fields: [winnerId], references: [id])
+}
+
+model KoiAuction {
+  id     String @id @default(uuid())
+  name   String
+  type   String
+  gender Gender
+  length Float
+  weight Float
+
+  price       Int // starting price
+  description String
+  images      String[]
+  certificate String?
+
+  status Status @default(AKTIF)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // INFORMATON ONLY FOR AUCION
+  startAt DateTime
+  endAt   DateTime
+
+  bids     Bid[]
+  winnerId String?
+  winner   User?   @relation(fields: [winnerId], references: [id])
+}
+
+model Bid {
+  id    String @id @default(uuid())
+  price Int
+
+  koiAuctionId String
+  koiAuction   KoiAuction @relation(fields: [koiAuctionId], references: [id])
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum Gender {
+  M
+  F
+}
+
+enum Status {
+  BELUM_DIMULAI
+  AKTIF
+  SELESAI
+  DIHAPUS
+}
+
+// CHAT
+
+model Chat {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type ChatType
+  role Role
+
+  content      String  @db.Text()
+  reference    String? // reference to koi sell, nego, or auction OR it can be midtrans direct url
+  callToAction String?
+  // call to action 
+  // ADMIN: NEGO_RESPONSE_ACCEPT(midtrans direct url), NEGO_RESPONSE_REJECT(notify if reject), AUCTION_RESPONSE_ACCEPT(midtrans direct url), AUCTION_RESPONSE_REJECT(notify if reject)
+  // USER: NEGO_REQUEST(request price)
+
+  readByAdmin Boolean @default(false)
+  readByUser  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum ChatType {
+  TEXT // text from USER or ADMIN
+  IMAGE // image url from USER or ADMIN
+
+  REFERENCE_SELL // reference to koi sell USER
+  REFERENCE_NEGO // reference to koi nego USER
+  REFERENCE_AUCTION // reference to koi auction USER
+
+  NEGO_RESPONSE_ACCEPT // midtrans direct url ADMIN
+  NEGO_RESPONSE_REJECT // notify if reject ADMIN
+  NEGO_REQUEST // request price from USER
+
+  AUCTION_RESPONSE_ACCEPT // midtrans direct url ADMIN
+  AUCTION_RESPONSE_REJECT // notify if user is not a winner ADMIN
+}
+
+model PaymentHistory {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type      PaymentType
+  reference String
+  amount    Int
+  status    PaymentStatus @default(PENDING)
+
+  midtransDirectUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  SUKSES
+  BATAL
+  KADALUARSA
+}
+
+enum PaymentType {
+  NEGO
+  AUCTION
+  SELL
+}
